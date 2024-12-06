@@ -3,33 +3,10 @@ import { Context, ManifestV2 } from "@uniformdev/context";
 import manifest from './context-manifest.json';
 import { walkNodeTree } from "@uniformdev/canvas";
 import { CANVAS_TEST_SLOT } from "@uniformdev/canvas";
-import { Buffer } from 'node:buffer';
 
 interface Env {
 	UNIFORM_API_KEY: string;
 	UNIFORM_PROJECT_ID: string;
-	SEGMENT_API_KEY: string;
-	SEGMENT_SPACE_ID: string;
-}
-
-const STORE_USER_COOKIE_NAME = 'demos_user_id';
-const STORE_ANONYMOUS_ID_COOKIE_NAME = 'ajs_anonymous_id';
-
-declare namespace SegmentProfile {
-	interface SegmentData {
-		traits?: Record<string, string | number | boolean>;
-	}
-
-	interface OrderCompletedEvent {
-		products: string;
-		amount: number;
-		categories: string;
-	}
-
-	interface SelectProductEvent {
-		product: string;
-		categories: string;
-	}
 }
 
 export default {
@@ -48,31 +25,22 @@ export default {
 			}
 		});
 
-		const [response, segmentData] = await Promise.all([
-			fetch(url.toString(), {
-				...request,
-				headers: {
-					...request.headers,
-					'x-api-key': env.UNIFORM_API_KEY,
-				},
-			}),
-			requestSegmentData({
-				userId: request.headers.get(STORE_USER_COOKIE_NAME),
-				anonymousId: request.headers.get(STORE_ANONYMOUS_ID_COOKIE_NAME),
-				env,
-			})
-		]);
+		const response = await fetch(url.toString(), {
+			...request,
+			headers: {
+				...request.headers,
+				'x-api-key': env.UNIFORM_API_KEY,
+			},
+		});
 
 		// is ok and json
 		const isOk = response.ok && url.pathname.toLowerCase() === '/api/v1/route';
 
 		if (isOk) {
 			const route = await response.json() as RouteGetResponse;
-
 			if (route.type === 'composition') {
 				await processComposition({
 					route,
-					segmentData,
 					quirks,
 				});
 
@@ -87,114 +55,23 @@ export default {
 	},
 } satisfies ExportedHandler<Env>;
 
-const requestSegmentData = async ({
-	userId,
-	anonymousId,
-	env,
-}: {
-	userId: string | null;
-	anonymousId: string | null;
-	env: Pick<Env, 'SEGMENT_API_KEY' | 'SEGMENT_SPACE_ID'>;
-}): Promise<SegmentProfile.SegmentData['traits'] | undefined> => {
-	let traits: SegmentProfile.SegmentData['traits'] | undefined;
-
-	if (userId) {
-		traits = await getSegmentTraitsByUserId({
-			env,
-			userId,
-		});
-	}
-
-	if (anonymousId && !traits) {
-		traits = await getSegmentTraitsByAnonymousId({
-			anonymousId,
-			env,
-		});
-	}
-
-	return traits;
-}
-
-export const getSegmentTraitsById = async ({
-	idSlug,
-	env,
-}: {
-	idSlug: string;
-	env: Pick<Env, 'SEGMENT_API_KEY' | 'SEGMENT_SPACE_ID'>;
-}) => {
-	const BASE_URL = `https://profiles.segment.com/v1/spaces/${env.SEGMENT_SPACE_ID}/collections/users/profiles`;
-	const BASIC_AUTH = Buffer.from(env.SEGMENT_API_KEY + ':').toString('base64');
-
-	const response = await fetch(`${BASE_URL}${idSlug}/traits`, {
-		headers: {
-			Authorization: `Basic ${BASIC_AUTH}`
-		},
-	});
-
-	const result = await response.json() as SegmentProfile.SegmentData;
-
-	return result;
-}
-
-export const getSegmentTraitsByAnonymousId = async ({
-	anonymousId,
-	env,
-}: {
-	anonymousId: string;
-	env: Pick<Env, 'SEGMENT_API_KEY' | 'SEGMENT_SPACE_ID'>;
-}) => {
-	if (!env.SEGMENT_SPACE_ID || !env.SEGMENT_API_KEY) {
-		console.info('The segment environment variables are not configured');
-		return {};
-	}
-
-	const segmentData = await getSegmentTraitsById({
-		env,
-		idSlug: `/anonymous_id:${anonymousId}`,
-	});
-
-	return segmentData?.traits || {};
-};
-
-export const getSegmentTraitsByUserId = async ({
-	userId,
-	env,
-}: {
-	userId: string;
-	env: Pick<Env, 'SEGMENT_API_KEY' | 'SEGMENT_SPACE_ID'>;
-}) => {
-	if (!env.SEGMENT_SPACE_ID || !env.SEGMENT_API_KEY) {
-		console.info('The segment environment variables are not configured');
-		return {};
-	}
-
-	const segmentData = await getSegmentTraitsById({
-		env,
-		idSlug: `/user_id:${userId}`,
-	});
-
-	return segmentData?.traits || {};
-};
 
 const processComposition = async ({
 	route,
-	segmentData,
 	quirks,
 }: {
 	route: RouteGetResponseComposition;
-	segmentData: SegmentProfile.SegmentData['traits'];
 	quirks: Record<string, string>;
 }) => {
 	const context = new Context({
 		manifest: manifest as ManifestV2,
 		defaultConsent: true,
+		requireConsentForPersonalization: false,
 	});
 
+	console.log({ quirks })
 	await context.update({
-		quirks: {
-			...formatQuirksFormTraits(segmentData),
-			...quirks,
-		}
+		quirks,
 	});
 
 	walkNodeTree(route.compositionApiResponse.composition, async (treeNode) => {
@@ -220,7 +97,7 @@ const processComposition = async ({
 				}
 
 				const mapped = mapSlotToPersonalizedVariations(slot);
-
+				console.log({ mapped })
 				const {
 					variations
 				} = context.personalize({
@@ -228,6 +105,8 @@ const processComposition = async ({
 					variations: mapped,
 					take: parsedCount,
 				});
+
+				console.log({ variations })
 
 				if (!variations) {
 					actions.remove();
@@ -264,10 +143,3 @@ const processComposition = async ({
 	});
 
 }
-
-export const formatQuirksFormTraits = (traits: SegmentProfile.SegmentData['traits'] = {}) =>
-	Object.keys(traits).reduce((accumulator: Record<string, string>, key) => {
-		accumulator[key.replaceAll('_', '')] = String(traits[key]);
-		return accumulator;
-	}, {}
-	);
