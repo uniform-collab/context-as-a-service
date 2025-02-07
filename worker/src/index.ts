@@ -1,4 +1,4 @@
-import { CANVAS_PERSONALIZE_SLOT, CANVAS_PERSONALIZE_TYPE, CANVAS_TEST_TYPE, ComponentParameter, RouteGetResponse, RouteGetResponseComposition, mapSlotToPersonalizedVariations, mapSlotToTestVariations } from "@uniformdev/canvas";
+import { CANVAS_PERSONALIZE_SLOT, CANVAS_PERSONALIZE_TYPE, CANVAS_TEST_TYPE, ComponentParameter, RootComponentInstance, RouteGetResponse, RouteGetResponseComposition, mapSlotToPersonalizedVariations, mapSlotToTestVariations } from "@uniformdev/canvas";
 import { Context, ManifestV2 } from "@uniformdev/context";
 import manifest from './context-manifest.json';
 import { walkNodeTree } from "@uniformdev/canvas";
@@ -18,14 +18,14 @@ export default {
 		url.searchParams.set('projectId', env.UNIFORM_PROJECT_ID);
 
 		const quirks: Record<string, string> = {};
-
 		request.headers.forEach((value, key) => {
-			if (key.startsWith('x-quirk-')) {
-				quirks[key.replace('x-quirk-', '')] = value;
+			if (key === 'quirks-segment') {
+				quirks["segment"] = value;
 			}
+			// console.log({ key, value });
 		});
 
-		const response = await fetch(url.toString(), {
+		const response = await fetch(`https://uniform.global/api/v1/composition?slug=${url.searchParams.get('slug')}&projectId=${env.UNIFORM_PROJECT_ID}`, {
 			...request,
 			headers: {
 				...request.headers,
@@ -34,21 +34,21 @@ export default {
 		});
 
 		// is ok and json
-		const isOk = response.ok && url.pathname.toLowerCase() === '/api/v1/route';
-
+		const isOk = response.ok;
 		if (isOk) {
-			const route = await response.json() as RouteGetResponse;
-			if (route.type === 'composition') {
-				await processComposition({
-					route,
-					quirks,
-				});
+			const { composition } = await response.json() as any;
+		//	console.log({ composition })
+			await processComposition({
+				composition,
+				quirks,
+			});
 
-				return new Response(JSON.stringify(route), {
-					status: response.status,
-					headers: response.headers,
-				});
-			}
+			// console.log("processed", { data: composition.slots.content[0].parameters.title.value })
+			return new Response(JSON.stringify(composition), {
+				status: response.status,
+				headers: response.headers,
+			});
+			//}
 		}
 
 		return response as any;
@@ -57,24 +57,24 @@ export default {
 
 
 const processComposition = async ({
-	route,
+	composition,
 	quirks,
 }: {
-	route: RouteGetResponseComposition;
+	composition: RootComponentInstance;
 	quirks: Record<string, string>;
 }) => {
+
 	const context = new Context({
 		manifest: manifest as ManifestV2,
 		defaultConsent: true,
 		requireConsentForPersonalization: false,
 	});
 
-	console.log({ quirks })
 	await context.update({
 		quirks,
 	});
 
-	walkNodeTree(route.compositionApiResponse.composition, async (treeNode) => {
+	walkNodeTree(composition, async (treeNode) => {
 		if (treeNode.type === 'component') {
 			const {
 				node,
@@ -97,7 +97,7 @@ const processComposition = async ({
 				}
 
 				const mapped = mapSlotToPersonalizedVariations(slot);
-				console.log({ mapped })
+				// console.log({ mapped: mapped.map(m => m.pz) })
 				const {
 					variations
 				} = context.personalize({
@@ -106,7 +106,7 @@ const processComposition = async ({
 					take: parsedCount,
 				});
 
-				console.log({ variations })
+				// console.log({ variations })
 
 				if (!variations) {
 					actions.remove();
