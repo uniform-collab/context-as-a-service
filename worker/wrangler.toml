@@ -1,0 +1,9 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "p13naas"
+main = "src/index.ts"
+compatibility_date = "2023-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+UNIFORM_API_KEY = "uf1g0y882lv3lzh7v9x6p0s98h7jwvxlupat7vw89qhymxy2awljtj4gm488llp33jnp2edhxgsqxteh6cn6a3dnlph5v9p49"
+UNIFORM_PROJECT_ID = "e0a985c6-d91e-439f-b02a-3d22c05eb17b"
