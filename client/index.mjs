@@ -1,10 +1,10 @@
 async function print() {
   const response = await fetch(
-    "http://localhost:8787/api/v1/composition?slug=demo",
+    "http://localhost:8787/api/v1/route?path=/",
     {
       headers: {
         // "quirks-segment": "gold",
-        "user-id": "123",
+        "visitor-id": "123",
       },
     }
   );

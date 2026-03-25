@@ -18,14 +18,31 @@ export default {
 		url.searchParams.set('projectId', env.UNIFORM_PROJECT_ID);
 
 		const quirks: Record<string, string> = {};
-		request.headers.forEach((value, key) => {
-			if (key === 'quirks-segment') {
-				quirks["segment"] = value;
-			}
-			// console.log({ key, value });
-		});
+		const visitorId = request.headers.get('visitor-id');
 
-		const response = await fetch(`https://uniform.global/api/v1/composition?slug=${url.searchParams.get('slug')}&projectId=${env.UNIFORM_PROJECT_ID}`, {
+		if (visitorId) {
+			const profileRes = await fetch(`https://cdpmock.vercel.app/api/profiles/${visitorId}`);
+			if (profileRes.ok) {
+				const profile = (await profileRes.json()) as {
+					audience: string;
+					geoProximity: string;
+					reservation: { confirmationNumber: string } | null;
+					membershipStatus: string;
+				};
+
+				if (profile.audience) {
+					quirks["audience"] = profile.audience;
+				}
+				if (profile.geoProximity) {
+					quirks["geoAudience"] = profile.geoProximity;
+				}
+				quirks["hasReservation"] = profile.reservation?.confirmationNumber ? "true" : "false";
+			}
+		}
+
+		console.log({ visitorId, quirks })
+
+		const response = await fetch(`https://uniform.global/api/v1/route?path=${url.searchParams.get('path')}&projectId=${env.UNIFORM_PROJECT_ID}&state=0`, {
 			...request,
 			headers: {
 				...request.headers,
@@ -36,25 +53,53 @@ export default {
 		// is ok and json
 		const isOk = response.ok;
 		if (isOk) {
-			const { composition } = await response.json() as any;
-		//	console.log({ composition })
-			await processComposition({
-				composition,
-				quirks,
-			});
+			const data = (await response.json()) as any;
+			if (data?.type === "composition") {
+				const composition = data?.compositionApiResponse?.composition;
+				await processComposition({
+					composition,
+					quirks,
+				});
 
-			// console.log("processed", { data: composition.slots.content[0].parameters.title.value })
-			return new Response(JSON.stringify(composition), {
-				status: response.status,
-				headers: response.headers,
+				// console.log("processed", { data: composition?.slots.mainContent })
+				return new Response(JSON.stringify(data), {
+					status: response.status,
+					headers: response.headers,
+				});
+				//}
+			}
+		} else {
+			return new Response(JSON.stringify({ error: 'Invalid response' }), {
+				status: 400,
+				headers: {
+					'Content-Type': 'application/json',
+				},
 			});
-			//}
 		}
-
-		return response as any;
 	},
 } satisfies ExportedHandler<Env>;
 
+
+function isWithinDateRange(node: { parameters?: Record<string, ComponentParameter<unknown>> }): boolean {
+	const startParam = node.parameters?.['start'] as ComponentParameter<{ datetime: string; timeZone: string }> | undefined;
+	const endParam = node.parameters?.['end'] as ComponentParameter<{ datetime: string; timeZone: string }> | undefined;
+
+	if (!startParam?.value && !endParam?.value) {
+		return true;
+	}
+
+	const now = new Date();
+
+	if (startParam?.value?.datetime && now < new Date(startParam.value.datetime)) {
+		return false;
+	}
+
+	if (endParam?.value?.datetime && now > new Date(endParam.value.datetime)) {
+		return false;
+	}
+
+	return true;
+}
 
 const processComposition = async ({
 	composition,
@@ -97,7 +142,6 @@ const processComposition = async ({
 				}
 
 				const mapped = mapSlotToPersonalizedVariations(slot);
-				// console.log({ mapped: mapped.map(m => m.pz) })
 				const {
 					variations
 				} = context.personalize({
@@ -106,12 +150,12 @@ const processComposition = async ({
 					take: parsedCount,
 				});
 
-				// console.log({ variations })
+				const dateFiltered = (variations ?? []).filter(v => isWithinDateRange(v));
 
-				if (!variations) {
+				if (dateFiltered.length === 0) {
 					actions.remove();
 				} else {
-					const [first, ...rest] = variations;
+					const [first, ...rest] = dateFiltered;
 
 					if (first) {
 						actions.replace(first);
@@ -133,11 +177,13 @@ const processComposition = async ({
 					variations: mapped,
 				});
 
-				if (!result) {
+				if (!result || !isWithinDateRange(result)) {
 					actions.remove();
 				} else {
 					actions.replace(result);
 				}
+			} else if (!isWithinDateRange(node)) {
+				actions.remove();
 			}
 		}
 	});

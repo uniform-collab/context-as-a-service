@@ -14,14 +14,14 @@
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.4.5",
 		"@cloudflare/workers-types": "^4.20240620.0",
+		"@uniformdev/cli": "^20.53.0",
 		"dotenv-cli": "^7.4.2",
 		"typescript": "^5.4.5",
 		"vitest": "1.5.0",
-		"wrangler": "3.48.0",
-		"@uniformdev/cli": "^19.209.1"
+		"wrangler": "^4.72.0"
 	},
 	"dependencies": {
-		"@uniformdev/canvas": "^19.209.1",
-		"@uniformdev/context": "^19.209.1"
+		"@uniformdev/canvas": "^20.53.0",
+		"@uniformdev/context": "^20.53.0"
 	}
 }
