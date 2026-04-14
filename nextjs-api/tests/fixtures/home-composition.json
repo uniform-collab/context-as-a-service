@@ -1,0 +1,235 @@
+{
+  "composition": {
+    "_name": "Home Screen",
+    "_slug": "/",
+    "type": "page",
+    "_locales": ["en-US"],
+    "_id": "26667348-5cd1-4185-b5a0-8413e1e87117",
+    "parameters": {
+      "metaTitle": {
+        "type": "text",
+        "locales": {
+          "en-US": "Home"
+        }
+      }
+    },
+    "slots": {
+      "content": [
+        {
+          "type": "$personalization",
+          "_id": "a730d031-4443-4223-a358-9b2e00647c19",
+          "parameters": {
+            "count": {
+              "type": "number",
+              "value": "1"
+            },
+            "trackingEventName": {
+              "type": "text",
+              "value": "Audience p13n"
+            }
+          },
+          "slots": {
+            "pz": [
+              {
+                "type": "hero",
+                "_id": "fa73f710-57e4-4986-b43c-1255385ab49e",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "For Loyalists" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "audience", "r": "loyalists", "op": "=", "t": "q" }],
+                      "name": "loyalists"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "a572b5d3-2d57-4ac5-a435-1cee16dc22fb",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "For Golfers" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "audience", "r": "golf", "op": "=", "t": "q" }],
+                      "name": "golf"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "ef1b455c-1e19-40a2-9e8b-c07569c1a560",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "For Leisure" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "audience", "r": "leisure", "op": "=", "t": "q" }],
+                      "name": "leisure"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "756f1ecb-afaa-4af8-b2e8-b41cc3bf16c8",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "For Corporate" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "audience", "r": "corporate", "op": "=", "t": "q" }],
+                      "name": "corporate"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "f86e1653-4cc4-44bf-ab0b-3afab076acc9",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "For Spa & Wellness" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "audience", "r": "wellness", "op": "=", "t": "q" }],
+                      "name": "spa-wellness"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "3a6efc86-0d02-45df-9ad9-5eeace06ab9b",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "Default Content" }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "$personalization",
+          "_id": "a9b2787a-0baa-40ce-b20e-7df8d71cd83d",
+          "parameters": {
+            "trackingEventName": {
+              "type": "text",
+              "value": "Reservation p13n"
+            }
+          },
+          "slots": {
+            "pz": [
+              {
+                "type": "hero",
+                "_id": "164a58ca-de37-4bc2-98c2-c115fe10bdc9",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "No Reservation" }
+                  },
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "hasReservation", "op": "=", "r": "false", "t": "q" }],
+                      "name": "no-reservation"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "be7182e7-43d1-447f-8f7a-8bb010a34564",
+                "parameters": {
+                  "$pzCrit": {
+                    "type": "$pzCrit",
+                    "value": {
+                      "crit": [{ "l": "hasReservation", "op": "=", "r": "true", "t": "q" }],
+                      "name": "has-reservation"
+                    }
+                  },
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "Reservation" }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "$test",
+          "_id": "cbead2ee-7d03-4929-a19d-8060bcd4caeb",
+          "parameters": {
+            "test": {
+              "type": "testSelect",
+              "value": "homeScreenHeroTest"
+            }
+          },
+          "slots": {
+            "test": [
+              {
+                "type": "hero",
+                "_id": "19bd4199-c5da-4b74-a00b-4ab2a42ffb3c",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "Control" }
+                  },
+                  "$tstVrnt": {
+                    "type": "testVariant",
+                    "value": {
+                      "id": "control",
+                      "control": true
+                    }
+                  }
+                }
+              },
+              {
+                "type": "hero",
+                "_id": "c1e66c76-e0dc-4276-b7f7-be0ba6dd16ab",
+                "parameters": {
+                  "title": {
+                    "type": "text",
+                    "locales": { "en-US": "Variant" }
+                  },
+                  "$tstVrnt": {
+                    "type": "testVariant",
+                    "value": {
+                      "id": "variant",
+                      "control": false
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "pattern": false,
+  "projectId": "2ba546ed-f0ba-44cb-887d-d5ec163f0125",
+  "state": 0,
+  "created": "2026-04-14T17:43:02.506555+00:00",
+  "modified": "2026-04-14T19:31:29.07442+00:00"
+}

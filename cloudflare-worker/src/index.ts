@@ -40,8 +40,6 @@ export default {
 			}
 		}
 
-		console.log({ visitorId, quirks })
-
 		const response = await fetch(`https://uniform.global/api/v1/route?path=${url.searchParams.get('path')}&projectId=${env.UNIFORM_PROJECT_ID}&state=0`, {
 			...request,
 			headers: {

@@ -1,0 +1,185 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding: 40px;
+  font-family: var(--font-geist-sans);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 32px;
+}
+
+.header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.header p {
+  font-size: 14px;
+  color: #666;
+}
+
+.endpoints {
+  margin-bottom: 32px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.endpoint {
+  font-family: var(--font-geist-mono);
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.endpoint:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #666;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  vertical-align: top;
+}
+
+.table tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.link {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  color: #0070f3;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.member {
+  background: #e0f2e9;
+  color: #1a7f4b;
+}
+
+.nonMember {
+  background: #f2e0e0;
+  color: #7f1a1a;
+}
+
+.local {
+  background: #e0e8f2;
+  color: #1a3d7f;
+}
+
+.outOfTowner {
+  background: #f2eee0;
+  color: #7f5c1a;
+}
+
+.noReservation {
+  color: #999;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .header p {
+    color: #999;
+  }
+
+  .endpoint {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .endpoint:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .table th {
+    border-bottom-color: rgba(255, 255, 255, 0.15);
+    color: #999;
+  }
+
+  .table td {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .table tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .link {
+    color: #3b9eff;
+  }
+
+  .member {
+    background: #1a3d2a;
+    color: #6ee7a0;
+  }
+
+  .nonMember {
+    background: #3d1a1a;
+    color: #e76e6e;
+  }
+
+  .local {
+    background: #1a2a3d;
+    color: #6ea0e7;
+  }
+
+  .outOfTowner {
+    background: #3d2e1a;
+    color: #e7b86e;
+  }
+
+  .noReservation {
+    color: #555;
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 20px;
+  }
+
+  .table {
+    font-size: 13px;
+  }
+}
