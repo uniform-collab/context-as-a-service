@@ -1,27 +1,26 @@
-import { CANVAS_PERSONALIZE_SLOT, CANVAS_PERSONALIZE_TYPE, CANVAS_TEST_TYPE, ComponentParameter, RootComponentInstance, RouteGetResponse, RouteGetResponseComposition, mapSlotToPersonalizedVariations, mapSlotToTestVariations } from "@uniformdev/canvas";
+import { CANVAS_PERSONALIZE_SLOT, CANVAS_PERSONALIZE_TYPE, CANVAS_TEST_TYPE, CANVAS_TEST_SLOT, ComponentParameter, RootComponentInstance, mapSlotToPersonalizedVariations, mapSlotToTestVariations, walkNodeTree } from "@uniformdev/canvas";
 import { Context, ManifestV2 } from "@uniformdev/context";
 import manifest from './context-manifest.json';
-import { walkNodeTree } from "@uniformdev/canvas";
-import { CANVAS_TEST_SLOT } from "@uniformdev/canvas";
 
 interface Env {
 	UNIFORM_API_KEY: string;
 	UNIFORM_PROJECT_ID: string;
+	UNIFORM_CLI_BASE_EDGE_URL?: string;
+	PROFILE_SERVICE_URL?: string;
 }
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		const url = new URL(request.url);
-		url.hostname = 'uniform.global';
-		url.protocol = 'https:';
-		url.port = '';
-		url.searchParams.set('projectId', env.UNIFORM_PROJECT_ID);
+		const cdpBaseUrl = new URL("/api/profiles", env.PROFILE_SERVICE_URL || "https://cdpmock.vercel.app").toString();
+		const uniformBaseUrl = new URL("/api/v1/route", env.UNIFORM_CLI_BASE_EDGE_URL || "https://uniform.global").toString();
 
-		const quirks: Record<string, string> = {};
+		const incomingUrl = new URL(request.url);
 		const visitorId = request.headers.get('visitor-id');
 
+		// Build quirks from CDP profile
+		const quirks: Record<string, string> = {};
 		if (visitorId) {
-			const profileRes = await fetch(`https://cdpmock.vercel.app/api/profiles/${visitorId}`);
+			const profileRes = await fetch(`${cdpBaseUrl}/${visitorId}`);
 			if (profileRes.ok) {
 				const profile = (await profileRes.json()) as {
 					audience: string;
@@ -30,73 +29,72 @@ export default {
 					membershipStatus: string;
 				};
 
-				if (profile.audience) {
-					quirks["audience"] = profile.audience;
-				}
-				if (profile.geoProximity) {
-					quirks["geoAudience"] = profile.geoProximity;
-				}
-				quirks["hasReservation"] = profile.reservation?.confirmationNumber ? "true" : "false";
+				Object.assign(quirks, {
+					...(profile.audience && { audience: profile.audience }),
+					...(profile.geoProximity && { geoAudience: profile.geoProximity }),
+					hasReservation: profile.reservation?.confirmationNumber ? "true" : "false",
+				});
 			}
 		}
 
-		const response = await fetch(`https://uniform.global/api/v1/route?path=${url.searchParams.get('path')}&projectId=${env.UNIFORM_PROJECT_ID}&state=0`, {
-			...request,
+		// Pass through all incoming query params, ensure projectId and state
+		const params = new URLSearchParams(incomingUrl.searchParams);
+		params.set('projectId', env.UNIFORM_PROJECT_ID);
+
+		const response = await fetch(`${uniformBaseUrl}?${params.toString()}`, {
+			method: 'GET',
 			headers: {
-				...request.headers,
 				'x-api-key': env.UNIFORM_API_KEY,
 			},
 		});
 
-		// is ok and json
-		const isOk = response.ok;
-		if (isOk) {
-			const data = (await response.json()) as any;
-			if (data?.type === "composition") {
-				const composition = data?.compositionApiResponse?.composition;
-				await processComposition({
-					composition,
-					quirks,
-				});
-
-				// console.log("processed", { data: composition?.slots.mainContent })
-				return new Response(JSON.stringify(data), {
-					status: response.status,
-					headers: response.headers,
-				});
-				//}
-			}
-		} else {
-			return new Response(JSON.stringify({ error: 'Invalid response' }), {
-				status: 400,
-				headers: {
-					'Content-Type': 'application/json',
-				},
+		if (!response.ok) {
+			return new Response(response.body, {
+				status: response.status,
+				headers: response.headers,
 			});
 		}
+
+		const data = (await response.json()) as any;
+		if (data?.type === "composition") {
+			const composition = data?.compositionApiResponse?.composition;
+			await processComposition({ composition, quirks });
+		}
+
+		return new Response(JSON.stringify(data), {
+			status: response.status,
+			headers: response.headers,
+		});
 	},
 } satisfies ExportedHandler<Env>;
 
+const METADATA_PARAMS = ["$pzCrit", "$tstVrnt"];
+const METADATA_TOP_LEVEL = ["pz", "control", "id"];
 
-function isWithinDateRange(node: { parameters?: Record<string, ComponentParameter<unknown>> }): boolean {
-	const startParam = node.parameters?.['start'] as ComponentParameter<{ datetime: string; timeZone: string }> | undefined;
-	const endParam = node.parameters?.['end'] as ComponentParameter<{ datetime: string; timeZone: string }> | undefined;
-
-	if (!startParam?.value && !endParam?.value) {
-		return true;
+function stripResolvedMetadata(node: Record<string, unknown>): void {
+	if (node.parameters && typeof node.parameters === "object") {
+		const params = node.parameters as Record<string, unknown>;
+		for (const key of METADATA_PARAMS) {
+			delete params[key];
+		}
 	}
 
-	const now = new Date();
-
-	if (startParam?.value?.datetime && now < new Date(startParam.value.datetime)) {
-		return false;
+	for (const key of METADATA_TOP_LEVEL) {
+		delete node[key];
 	}
 
-	if (endParam?.value?.datetime && now > new Date(endParam.value.datetime)) {
-		return false;
+	if (node.slots && typeof node.slots === "object") {
+		const slots = node.slots as Record<string, unknown[]>;
+		for (const slotChildren of Object.values(slots)) {
+			if (Array.isArray(slotChildren)) {
+				for (const child of slotChildren) {
+					if (child && typeof child === "object") {
+						stripResolvedMetadata(child as Record<string, unknown>);
+					}
+				}
+			}
+		}
 	}
-
-	return true;
 }
 
 const processComposition = async ({
@@ -106,23 +104,17 @@ const processComposition = async ({
 	composition: RootComponentInstance;
 	quirks: Record<string, string>;
 }) => {
-
 	const context = new Context({
 		manifest: manifest as ManifestV2,
 		defaultConsent: true,
 		requireConsentForPersonalization: false,
 	});
 
-	await context.update({
-		quirks,
-	});
+	await context.update({ quirks });
 
 	walkNodeTree(composition, async (treeNode) => {
 		if (treeNode.type === 'component') {
-			const {
-				node,
-				actions,
-			} = treeNode;
+			const { node, actions } = treeNode;
 
 			if (node.type === CANVAS_PERSONALIZE_TYPE) {
 				const slot = node.slots?.[CANVAS_PERSONALIZE_SLOT];
@@ -130,7 +122,6 @@ const processComposition = async ({
 				const count = node.parameters?.['count'] as ComponentParameter<number | string>;
 
 				let parsedCount: number | undefined;
-
 				if (typeof count === 'string') {
 					parsedCount = parseInt(count, 10);
 				} else if (typeof count !== 'number') {
@@ -140,25 +131,20 @@ const processComposition = async ({
 				}
 
 				const mapped = mapSlotToPersonalizedVariations(slot);
-				const {
-					variations
-				} = context.personalize({
+				const { variations } = context.personalize({
 					name: trackingEventName.value ?? 'Untitled Personalization',
 					variations: mapped,
 					take: parsedCount,
 				});
 
-				const dateFiltered = (variations ?? []).filter(v => isWithinDateRange(v));
-
-				if (dateFiltered.length === 0) {
+				if (!variations || variations.length === 0) {
 					actions.remove();
 				} else {
-					const [first, ...rest] = dateFiltered;
+					const [first, ...rest] = variations;
 
 					if (first) {
 						actions.replace(first);
 					}
-
 					if (rest.length) {
 						actions.insertAfter(rest);
 					}
@@ -168,22 +154,19 @@ const processComposition = async ({
 				const testName = node.parameters?.['test'] as ComponentParameter<string | undefined>;
 				const mapped = mapSlotToTestVariations(slot);
 
-				const {
-					result
-				} = context.test({
+				const { result } = context.test({
 					name: testName.value ?? 'Untitled Test',
 					variations: mapped,
 				});
 
-				if (!result || !isWithinDateRange(result)) {
+				if (!result) {
 					actions.remove();
 				} else {
 					actions.replace(result);
 				}
-			} else if (!isWithinDateRange(node)) {
-				actions.remove();
 			}
 		}
 	});
 
+	stripResolvedMetadata(composition);
 }
