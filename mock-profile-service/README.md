@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mock Profile Service
 
-## Getting Started
+A Next.js app that serves as a **mock CDP (Customer Data Platform)** for the Context as a Service demo. It provides visitor profile data that the context service wrappers use to build personalization quirks.
 
-First, run the development server:
+In production, this would be replaced by a real CDP, CRM, loyalty system, or identity service.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## API
+
+### `GET /api/profiles/:id`
+
+Returns the profile for a given visitor ID.
+
+**Response shape:**
+
+```json
+{
+  "id": "1",
+  "name": "Marcus Chen",
+  "audience": "loyalists",
+  "zipCode": "13478",
+  "geoProximity": "local",
+  "reservation": {
+    "confirmationNumber": "TS-20260315-8841",
+    "hotelName": "The Lodge",
+    "checkIn": "2026-03-15",
+    "checkOut": "2026-03-18"
+  },
+  "membershipStatus": "member"
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Profile data
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The service includes 10 test visitors covering all audience segments and reservation states:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| ID | Name | Audience | Geo | Reservation | Membership |
+|----|------|----------|-----|-------------|------------|
+| 1 | Marcus Chen | loyalists | local | Yes | member |
+| 2 | Priya Patel | golf | local | Yes | member |
+| 3 | Sofia Rodriguez | leisure | out-of-towner | Yes | non-member |
+| 4 | James O'Brien | corporate | local | No | member |
+| 5 | Aisha Johnson | wellness | out-of-towner | Yes | non-member |
+| 6 | Volodymyr Chervoniy | golf | local | Yes | member |
+| 7 | Hannah Kim | corporate | out-of-towner | Yes | non-member |
+| 8 | Luca Moretti | loyalists | local | Yes | member |
+| 9 | Tanya Brooks | leisure | local | No | non-member |
+| 10 | Erik Johansson | wellness | out-of-towner | Yes | member |
 
-## Learn More
+## How the context service uses profiles
 
-To learn more about Next.js, take a look at the following resources:
+The context service maps profile fields to **quirks** for Uniform personalization:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Profile field | Quirk key | Example value |
+|---------------|-----------|---------------|
+| `audience` | `audience` | `"loyalists"`, `"golf"`, `"leisure"`, `"corporate"`, `"wellness"` |
+| `geoProximity` | `geoAudience` | `"local"`, `"out-of-towner"` |
+| `reservation` | `hasReservation` | `"true"` / `"false"` (based on confirmation number presence) |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Setup
 
-## Deploy on Vercel
+```bash
+npm install
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Runs at `http://localhost:3000` by default. Configure the context service wrappers to point to this URL via the `PROFILE_SERVICE_URL` environment variable.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+Deployed at `https://cdpmock.vercel.app` for the demo. All context service wrappers default to this URL when `PROFILE_SERVICE_URL` is not set.
