@@ -1,0 +1,187 @@
+composition:
+  _name: Home Screen
+  _id: 26667348-5cd1-4185-b5a0-8413e1e87117
+  _slug: /
+  type: page
+  parameters:
+    metaTitle:
+      type: text
+      locales:
+        en-US: Home
+  slots:
+    content:
+      - _id: a730d031-4443-4223-a358-9b2e00647c19
+        type: $personalization
+        slots:
+          pz:
+            - _id: fa73f710-57e4-4986-b43c-1255385ab49e
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: For Loyalists
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: audience
+                        r: loyalists
+                        t: q
+                        op: '='
+                    name: loyalists
+            - _id: a572b5d3-2d57-4ac5-a435-1cee16dc22fb
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: For Golfers
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: audience
+                        r: golf
+                        t: q
+                        op: '='
+                    name: golf
+            - _id: ef1b455c-1e19-40a2-9e8b-c07569c1a560
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: For Leisure
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: audience
+                        r: leisure
+                        t: q
+                        op: '='
+                    name: leisure
+            - _id: 756f1ecb-afaa-4af8-b2e8-b41cc3bf16c8
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: For Corporate
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: audience
+                        r: corporate
+                        t: q
+                        op: '='
+                    name: corporate
+            - _id: f86e1653-4cc4-44bf-ab0b-3afab076acc9
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: For Spa & Wellness
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: audience
+                        r: wellness
+                        t: q
+                        op: '='
+                    name: spa-wellness
+            - _id: 3a6efc86-0d02-45df-9ad9-5eeace06ab9b
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: Default Content
+        parameters:
+          count:
+            type: number
+            value: '1'
+          trackingEventName:
+            type: text
+            value: Audience p13n
+      - _id: a9b2787a-0baa-40ce-b20e-7df8d71cd83d
+        type: $personalization
+        slots:
+          pz:
+            - _id: 164a58ca-de37-4bc2-98c2-c115fe10bdc9
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: No Reservation
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: hasReservation
+                        r: 'false'
+                        t: q
+                        op: '='
+                    name: no-reservation
+            - _id: be7182e7-43d1-447f-8f7a-8bb010a34564
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: Reservation
+                $pzCrit:
+                  type: $pzCrit
+                  value:
+                    crit:
+                      - l: hasReservation
+                        r: 'true'
+                        t: q
+                        op: '='
+                    name: has-reservation
+        parameters:
+          trackingEventName:
+            type: text
+            value: Reservation p13n
+      - _id: cbead2ee-7d03-4929-a19d-8060bcd4caeb
+        type: $test
+        slots:
+          test:
+            - _id: 19bd4199-c5da-4b74-a00b-4ab2a42ffb3c
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: Control
+                $tstVrnt:
+                  type: testVariant
+                  value:
+                    id: control
+                    control: true
+            - _id: c1e66c76-e0dc-4276-b7f7-be0ba6dd16ab
+              type: hero
+              parameters:
+                title:
+                  type: text
+                  locales:
+                    en-US: Variant
+                $tstVrnt:
+                  type: testVariant
+                  value:
+                    id: variant
+                    control: false
+        parameters:
+          test:
+            type: testSelect
+            value: homeScreenHeroTest
+  _locales:
+    - en-US
+created: '2026-04-14T23:15:09.025385+00:00'
+modified: '2026-04-14T23:15:09.025385+00:00'
+pattern: false

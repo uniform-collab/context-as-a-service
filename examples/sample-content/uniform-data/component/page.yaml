@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://eu.uniform.app/schemas/json-schema/component-definition/v1.json
+$schema: https://eu.uniform.app/schemas/json-schema/component-definition/v1.json
+id: page
+name: Mobile View
+icon: device-mobile
+parameters:
+  - id: metaTitle
+    name: Meta Title
+    type: text
+    typeConfig:
+      required: true
+    localizable: true
+    notLocalizedByDefault: true
+useTeamPermissions: true
+slots:
+  - id: content
+    name: Content
+    allowedComponents:
+      - hero
+      - $personalization
+      - $test
+      - $loop
+    inheritAllowedComponents: false
+slugSettings:
+  unique: global
+  required: 'yes'
+  regularExpression: ''
+  regularExpressionMessage: ''
+canBeComposition: true
+created: '2026-04-14T23:15:04.157207+00:00'
+updated: '2026-04-14T23:15:04.157207+00:00'
