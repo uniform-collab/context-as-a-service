@@ -1,0 +1,8 @@
+id: hasReservation
+name: Has Reservation
+description: ''
+options:
+  - name: 'Yes'
+    value: 'true'
+  - name: 'No'
+    value: 'false'

@@ -1,0 +1,39 @@
+{
+	"name": "@uniformdev/context-service-akamai",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"start": "rollup -c -w",
+		"clean": "rm -rf dist",
+		"build": "npm run clean && node scripts/increment-version.js && rollup -c && npm run build:bundle",
+		"build:bundle": "cp src/bundle.json dist/bundle.json",
+		"uniform:manifest": "uniform context manifest download --output ./src/context-manifest.json",
+		"akamai:deploy": "akamai edgeworkers upload --codeDir ./dist ${EW_ID:-80886}",
+		"akamai:activate": "akamai edgeworkers activate 80886 production",
+		"tar": "tar -czf ./dist/caas-akamai.tgz -C ./dist bundle.json main.js",
+		"sandbox:deploy": "akamai sandbox add-edgeworker ${EW_ID:-80886} ./dist/caas-akamai.tgz",
+		"sandbox:update": "akamai sandbox update-edgeworker ${EW_ID:-80886} ./dist/caas-akamai.tgz",
+		"s:deploy": "npm run build && npm run tar && npm run sandbox:update",
+		"s:start": "akamai sandbox start --print-logs",
+		"s:create": "akamai sandbox create --hostname ${SANDBOX_HOSTNAME:-akamai-artemn.unfrm.uno} --name ${SANDBOX_NAME:-artem-caas-demo-v1}"
+	},
+	"devDependencies": {
+		"@rollup/plugin-commonjs": "^28.0.2",
+		"@rollup/plugin-json": "^6.1.0",
+		"@rollup/plugin-node-resolve": "^16.0.0",
+		"@rollup/plugin-typescript": "^12.1.2",
+		"@types/akamai-edgeworkers": "^1.1.18",
+		"@types/md5": "^2.3.5",
+		"@uniformdev/cli": "^20.58.0",
+		"dotenv-cli": "^7.4.2",
+		"rollup": "^4.34.6",
+		"tar": "^7.4.3",
+		"typescript": "^5.4.5"
+	},
+	"dependencies": {
+		"@uniformdev/canvas": "^20.58.0",
+		"@uniformdev/context": "^20.58.0",
+		"@uniformdev/context-engine": "workspace:*",
+		"md5": "^2.3.0"
+	}
+}

@@ -1,0 +1,8 @@
+id: geoAudience
+name: Geo Proximity
+description: ''
+options:
+  - name: Local Guests
+    value: local
+  - name: Out of Towners
+    value: out
