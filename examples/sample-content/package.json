@@ -1,0 +1,12 @@
+{
+  "name": "@uniformdev/context-service-sample-content",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "uniform:pull": "uniform sync pull",
+    "uniform:push": "uniform sync push"
+  },
+  "dependencies": {
+    "@uniformdev/cli": "^20.58.0"
+  }
+}

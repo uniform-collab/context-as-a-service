@@ -1,0 +1,14 @@
+{
+  "name": "context-as-a-service",
+  "private": true,
+  "packageManager": "pnpm@10.19.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2"
+  }
+}

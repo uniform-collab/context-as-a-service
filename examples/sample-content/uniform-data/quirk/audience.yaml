@@ -1,0 +1,14 @@
+id: audience
+name: Audience
+description: ''
+options:
+  - name: Loyalists
+    value: loyalists
+  - name: Golf
+    value: golf
+  - name: Leisure
+    value: leisure
+  - name: Corporate
+    value: corporate
+  - name: Spa & Wellness
+    value: wellness

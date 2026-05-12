@@ -1,0 +1,19 @@
+composition:
+  _name: Shared Hero
+  _id: 5b887b49-6fff-408e-9cf4-181a975da8d9
+  type: hero
+  parameters:
+    title:
+      type: text
+      locales:
+        en-US: Shared Hero
+  _overridability:
+    variants: true
+    parameters:
+      title: 'yes'
+      description: 'yes'
+  _locales:
+    - en-US
+created: '2026-04-14T23:15:09.541629+00:00'
+modified: '2026-04-14T23:15:15.267802+00:00'
+pattern: true

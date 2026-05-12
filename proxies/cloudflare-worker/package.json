@@ -1,0 +1,29 @@
+{
+	"name": "@uniformdev/context-service-cloudflare",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "dotenv -- wrangler dev",
+		"start": "wrangler dev",
+		"build": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"cf-typegen": "wrangler types",
+		"hmm": "wrangler -v",
+		"pull:manifest": "uniform context manifest download --output ./src/context-manifest.json"
+	},
+	"dependencies": {
+		"@uniformdev/canvas": "^20.58.0",
+		"@uniformdev/context": "^20.58.0",
+		"@uniformdev/context-engine": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.4.5",
+		"@cloudflare/workers-types": "^4.20240620.0",
+		"@uniformdev/cli": "^20.58.0",
+		"dotenv-cli": "^7.4.2",
+		"typescript": "^5.4.5",
+		"vitest": "1.5.0",
+		"wrangler": "^4.83.0"
+	}
+}
