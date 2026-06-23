@@ -41,15 +41,48 @@ async function buildQuirks(
 	return quirks;
 }
 
+function parseUrl(value: string | undefined): URL | null {
+	if (!value) {
+		return null;
+	}
+
+	try {
+		return new URL(value);
+	} catch {
+		return null;
+	}
+}
+
+const QUIRK_HEADER_PREFIX = "x-quirk-";
+
+function quirksFromHeaders(headers: Headers): Record<string, string> {
+	const quirks: Record<string, string> = {};
+
+	for (const [name, value] of headers.entries()) {
+		if (name.startsWith(QUIRK_HEADER_PREFIX)) {
+			const key = name.slice(QUIRK_HEADER_PREFIX.length);
+			if (key) {
+				quirks[key] = value;
+			}
+		}
+	}
+
+	return quirks;
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		const cdpBaseUrl = new URL("/api/profiles", env.PROFILE_SERVICE_URL || "https://cdpmock.vercel.app").toString();
 		const uniformBaseUrl = new URL("/api/v1/route", env.UNIFORM_CLI_BASE_EDGE_URL || "https://uniform.global").toString();
-
 		const incomingUrl = new URL(request.url);
-		const visitorId = request.headers.get('visitor-id');
-		const quirks = await buildQuirks(visitorId, cdpBaseUrl);
 
+		const quirks = quirksFromHeaders(request.headers);
+
+		const profileServiceUrl = parseUrl(env.PROFILE_SERVICE_URL);
+		if (profileServiceUrl) {
+			const cdpBaseUrl = new URL("/api/profiles", profileServiceUrl).toString();
+			const visitorId = request.headers.get('visitor-id');
+			Object.assign(quirks, await buildQuirks(visitorId, cdpBaseUrl));
+		}
 		const params = new URLSearchParams(incomingUrl.searchParams);
 		params.set('projectId', env.UNIFORM_PROJECT_ID);
 
