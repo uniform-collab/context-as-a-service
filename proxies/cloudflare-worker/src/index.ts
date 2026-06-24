@@ -1,13 +1,20 @@
 import { type RootComponentInstance } from "@uniformdev/canvas";
-import { type ManifestV2 } from "@uniformdev/context";
+import { type ContextPlugin, type ManifestV2 } from "@uniformdev/context";
 import { processComposition } from "@uniformdev/context-engine";
 import manifest from './context-manifest.json';
+import {
+	collectSegmentIds,
+	createCustomSegmentTargetingPlugin,
+	fetchSegmentMemberships,
+} from './customSegmentTargeting';
 
 interface Env {
 	UNIFORM_API_KEY: string;
 	UNIFORM_PROJECT_ID: string;
 	UNIFORM_CLI_BASE_EDGE_URL?: string;
 	PROFILE_SERVICE_URL?: string;
+	/** D1 database holding segment -> customer id membership. */
+	DB?: D1Database;
 }
 
 interface Profile {
@@ -50,6 +57,37 @@ function parseUrl(value: string | undefined): URL | null {
 		return new URL(value);
 	} catch {
 		return null;
+	}
+}
+
+const CUSTOMER_ID_HEADER = "x-customer-id";
+
+/**
+ * Builds the Context plugins for a composition. Currently registers the
+ * custom-segment-targeting personalization algorithm, pre-loading the relevant
+ * segment membership from D1 because the algorithm itself runs synchronously.
+ */
+async function buildContextPlugins(
+	composition: RootComponentInstance,
+	request: Request,
+	env: Env,
+): Promise<ContextPlugin[] | undefined> {
+	if (!env.DB) {
+		return undefined;
+	}
+
+	const segmentIds = collectSegmentIds(composition);
+	if (segmentIds.length === 0) {
+		return undefined;
+	}
+
+	try {
+		const segments = await fetchSegmentMemberships(env.DB, segmentIds);
+		const customerId = request.headers.get(CUSTOMER_ID_HEADER);
+		return [createCustomSegmentTargetingPlugin({ customerId, segments })];
+	} catch (error) {
+		console.error("[custom-segment-targeting] failed to load segments from D1", error);
+		return undefined;
 	}
 }
 
@@ -103,10 +141,12 @@ export default {
 		const data = (await response.json()) as Record<string, unknown>;
 		if (data?.type === "composition") {
 			const composition = (data as any)?.compositionApiResponse?.composition as RootComponentInstance;
+			const plugins = await buildContextPlugins(composition, request, env);
 			await processComposition({
 				composition,
 				quirks,
 				manifest: manifest as ManifestV2,
+				contextOptions: plugins ? { plugins } : undefined,
 			});
 		}
 

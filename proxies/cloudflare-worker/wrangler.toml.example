@@ -8,3 +8,10 @@ compatibility_flags = ["nodejs_compat"]
 UNIFORM_API_KEY = ""
 UNIFORM_PROJECT_ID = ""
 NEXT_PUBLIC_ANALYTICS_WRITE_KEY = ""
+
+# Segment membership for the custom-segment-targeting personalization algorithm.
+# Create the database with `pnpm d1:create` and replace database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "segments"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
