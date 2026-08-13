@@ -7,7 +7,7 @@ A Cloudflare Worker that acts as a BFF for server-side Uniform Context personali
 A single `fetch` handler receives all requests, resolves personalization and A/B tests against Uniform's Route API, and returns a clean composition.
 
 1. On **GET**, reads `visitor-id` and/or `x-quirk-*` headers. `visitor-id` fetches the mock CDP profile to build quirks.
-2. On **POST**, reads a JSON visitor body (quirks, device, scores, tests) and skips CDP lookup.
+2. On **POST**, this Worker's `src/visitorPayload.ts` parser reads the JSON body and skips CDP lookup. Replace that file with your own payload contract.
 3. **GET**s the Uniform Route API with `projectId` and `x-api-key` (cacheable). The personalized response is not cached.
 4. Walks the composition tree to resolve personalization and A/B test nodes.
 5. Strips SDK metadata and returns the processed composition with `x-uniform-visitor-source`.
@@ -50,6 +50,7 @@ sequenceDiagram
 cloudflare-worker/
 +-- src/
 |   +-- index.ts                Worker entry point
+|   +-- visitorPayload.ts       This Worker's POST body parser (replaceable)
 |   +-- context-manifest.json   Uniform Context manifest
 +-- wrangler.toml               Wrangler config (gitignored)
 +-- wrangler.toml.example       Template config

@@ -1,12 +1,12 @@
 import type { RouteGetResponse } from '@uniformdev/canvas';
 import type { ManifestV2 } from '@uniformdev/context';
+import { processComposition } from '@uniformdev/context-engine';
 import {
-	processComposition,
 	resolvePostVisitorBody,
 	quirksFromHeaderRecord,
 	extractUniformCookies,
 	createCookieTransitionStore,
-} from '@uniformdev/context-engine';
+} from './visitorPayload';
 import manifest from './context-manifest.json';
 import { httpRequest } from 'http-request';
 import { logger } from 'log';

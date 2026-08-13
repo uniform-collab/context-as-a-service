@@ -11,20 +11,6 @@ import type { ComponentInstance, ComponentParameter, RootComponentInstance } fro
 import { Context } from "@uniformdev/context";
 import type { ContextOptions, EnrichmentData, EventData, ManifestV2 } from "@uniformdev/context";
 
-export {
-  CLIENT_VISITOR_BODY_MAX_CHARS,
-  createCookieTransitionStore,
-  extractUniformCookies,
-  parseVisitorBody,
-  quirksFromHeaderRecord,
-  resolvePostVisitorBody,
-  visitorFromClientPayload,
-  type ClientVisitorPayload,
-  type ParseVisitorBodyResult,
-  type ResolvedVisitorIdentity,
-  type ResolvePostVisitorResult,
-} from "./visitor-payload";
-
 export interface ProcessCompositionOptions {
   composition: RootComponentInstance;
   quirks: Record<string, string>;

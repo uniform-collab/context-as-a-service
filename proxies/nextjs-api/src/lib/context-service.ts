@@ -1,12 +1,11 @@
 import { type RootComponentInstance } from "@uniformdev/canvas";
 import { type ManifestV2 } from "@uniformdev/context";
+import { processComposition } from "@uniformdev/context-engine";
+export { processComposition };
 import {
-  processComposition,
   resolvePostVisitorBody,
   createCookieTransitionStore,
-  quirksFromHeaderRecord,
-} from "@uniformdev/context-engine";
-export { processComposition };
+} from "./visitorPayload";
 import manifest from "./context-manifest.json";
 import { NextResponse } from "next/server";
 
@@ -165,4 +164,4 @@ export async function handleContextRequest(
   });
 }
 
-export { quirksFromHeaderRecord };
+export { quirksFromHeaderRecord } from "./visitorPayload";

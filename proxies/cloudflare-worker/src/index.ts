@@ -1,11 +1,11 @@
 import { type RootComponentInstance } from "@uniformdev/canvas";
 import { type ManifestV2 } from "@uniformdev/context";
+import { processComposition } from "@uniformdev/context-engine";
 import {
-	processComposition,
 	resolvePostVisitorBody,
 	createCookieTransitionStore,
-	quirksFromHeaderRecord,
-} from "@uniformdev/context-engine";
+	quirksFromHeaders,
+} from "./visitorPayload";
 import manifest from './context-manifest.json';
 
 interface Env {
@@ -78,9 +78,7 @@ export default {
 			return jsonError(postResult.status, postResult.message);
 		}
 
-		const headerQuirks = quirksFromHeaderRecord(
-			Object.fromEntries(request.headers.entries()),
-		);
+		const headerQuirks = quirksFromHeaders(request.headers);
 
 		let quirks = { ...headerQuirks };
 		let enrichments = undefined;

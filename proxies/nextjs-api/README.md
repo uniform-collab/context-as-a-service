@@ -65,6 +65,7 @@ nextjs-api/
 |   |       +-- route.ts              (A) Node.js API route handler
 |   +-- lib/
 |   |   +-- context-service.ts        Shared core logic
+|   |   +-- visitorPayload.ts         This proxy's POST body parser (replaceable)
 |   |   +-- context-manifest.json     Uniform Context manifest
 |   +-- middleware.ts                 (B) Vercel Edge middleware
 +-- tests/
@@ -84,9 +85,11 @@ nextjs-api/
 |----------|---------|
 | `buildQuirks(visitorId)` | Fetches CDP profile, returns quirks map |
 | `fetchComposition(searchParams, projectId, apiKey)` | Calls Uniform Route API, forwards all query params |
+| `handleContextRequest(searchParams, visitorId, options?)` | Full orchestrator -- GET uses CDP/`x-quirk-*`; POST uses this proxy's parser |
 | `processComposition({ composition, quirks })` | Walks the tree: resolves personalization and A/B tests |
 | `stripResolvedMetadata(node)` | Recursively removes SDK metadata from resolved nodes |
-| `handleContextRequest(searchParams, visitorId, options?)` | Full orchestrator -- GET uses CDP/`x-quirk-*`; POST uses client JSON body |
+
+**`src/lib/visitorPayload.ts`** -- This proxy's POST JSON parser. Not shared. Replace with your device/CDP contract.
 
 **`src/app/api/v1/route/route.ts`** -- Mode A. Standard Next.js App Router GET/POST handlers, Node.js runtime.
 

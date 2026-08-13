@@ -6,7 +6,7 @@ An Akamai EdgeWorker that provides server-side Uniform Context personalization a
 
 - **Header-based quirks** -- reads `x-quirk-*` headers from the incoming request instead of (or in addition to) a CDP profile lookup. This allows the CDN or origin to inject quirks upstream.
 - **Cookie-based transition data** -- uses `CookieTransitionDataStore` with `ufvd` and `ufvdqk` cookies for persistent visitor context across requests.
-- **POST visitor body** -- optional JSON body (quirks, device, scores, tests) instead of cookie/header injection.
+- **POST visitor body** -- optional JSON parsed by this proxy's `src/visitorPayload.ts` (replace with your own contract). Skips cookie/header injection.
 - **Akamai property variables** -- reads `PMUSER_UNIFORM_PROJECTID` and `PMUSER_UNIFORM_API_KEY` from Akamai property manager variables instead of environment variables.
 - **Rollup bundle** -- EdgeWorkers require a single bundled JS file with a `bundle.json` manifest, built via Rollup.
 
@@ -79,6 +79,7 @@ curl -X POST 'https://<ew-host>/api/v1/route?path=/' \
 akamai-edgeworker/
 +-- src/
 |   +-- main.ts                 EdgeWorker entry point
+|   +-- visitorPayload.ts       This proxy's POST body parser (replaceable)
 |   +-- bundle.json             Akamai bundle manifest
 |   +-- context-manifest.json   Uniform Context manifest
 +-- tests/                      Jest tests

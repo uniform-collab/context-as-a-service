@@ -115,9 +115,7 @@ Shared library (`@uniformdev/context-engine`) that all proxies depend on. Provid
 - **`processComposition()`** -- walks a Uniform composition tree and resolves personalization and A/B test nodes in-place, then strips SDK metadata
 - **`stripResolvedMetadata()`** -- recursively removes resolution metadata (`$pzCrit`, `$tstVrnt`, `pz`, `control`, `id`, `testDistribution`) from all nodes
 
-The library accepts a manifest and optional context options (e.g. `CookieTransitionDataStore`), keeping it runtime-agnostic. Each proxy only handles its platform-specific concerns (HTTP, env vars, quirks sourcing).
-
-It also parses the optional **POST visitor body** (`parseVisitorBody`, `resolvePostVisitorBody`) so Akamai, Cloudflare, and Next.js share the same client-supplied identity contract.
+The library accepts a manifest and optional context options (e.g. `CookieTransitionDataStore`), keeping it runtime-agnostic. Each proxy only handles its platform-specific concerns (HTTP, env vars, and **its own visitor-body parser**). POST payload shape is not part of this package — customers replace the per-proxy parser with their own contract.
 
 ## Proxy implementations
 
@@ -184,7 +182,7 @@ Proxies to Uniform's Route API with server-side personalization applied. All que
 
 ### `POST /api/v1/route?path=<page-path>`
 
-Same Uniform GET under the hood, but visitor identity comes from the JSON body instead of CDP/cookie injection. Body must be **2000 characters or fewer**.
+Same Uniform GET under the hood, but visitor identity comes from the JSON body instead of CDP/cookie injection. **Each proxy has its own parser** (`visitorPayload.ts`) — replace it with your payload contract. Demo body max **2000** characters.
 
 ```json
 {
