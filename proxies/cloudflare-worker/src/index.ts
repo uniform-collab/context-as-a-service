@@ -1,6 +1,11 @@
 import { type RootComponentInstance } from "@uniformdev/canvas";
 import { type ManifestV2 } from "@uniformdev/context";
-import { processComposition } from "@uniformdev/context-engine";
+import {
+	processComposition,
+	resolvePostVisitorBody,
+	createCookieTransitionStore,
+	quirksFromHeaderRecord,
+} from "@uniformdev/context-engine";
 import manifest from './context-manifest.json';
 
 interface Env {
@@ -53,21 +58,11 @@ function parseUrl(value: string | undefined): URL | null {
 	}
 }
 
-const QUIRK_HEADER_PREFIX = "x-quirk-";
-
-function quirksFromHeaders(headers: Headers): Record<string, string> {
-	const quirks: Record<string, string> = {};
-
-	for (const [name, value] of headers.entries()) {
-		if (name.startsWith(QUIRK_HEADER_PREFIX)) {
-			const key = name.slice(QUIRK_HEADER_PREFIX.length);
-			if (key) {
-				quirks[key] = value;
-			}
-		}
-	}
-
-	return quirks;
+function jsonError(status: number, message: string): Response {
+	return new Response(JSON.stringify({ error: message }), {
+		status,
+		headers: { "Content-Type": "application/json" },
+	});
 }
 
 export default {
@@ -75,21 +70,51 @@ export default {
 		const uniformBaseUrl = new URL("/api/v1/route", env.UNIFORM_CLI_BASE_EDGE_URL || "https://uniform.global").toString();
 		const incomingUrl = new URL(request.url);
 
-		const quirks = quirksFromHeaders(request.headers);
-
-		const profileServiceUrl = parseUrl(env.PROFILE_SERVICE_URL);
-		if (profileServiceUrl) {
-			const cdpBaseUrl = new URL("/api/profiles", profileServiceUrl).toString();
-			const visitorId = request.headers.get('visitor-id');
-			Object.assign(quirks, await buildQuirks(visitorId, cdpBaseUrl));
+		const postResult = resolvePostVisitorBody(
+			request.method,
+			request.method === "POST" ? await request.text() : "",
+		);
+		if (!postResult.ok) {
+			return jsonError(postResult.status, postResult.message);
 		}
+
+		const headerQuirks = quirksFromHeaderRecord(
+			Object.fromEntries(request.headers.entries()),
+		);
+
+		let quirks = { ...headerQuirks };
+		let enrichments = undefined;
+		let events = undefined;
+		let transitionStore = undefined;
+		let visitorSource: "client-body" | "cdp" | "headers" = Object.keys(headerQuirks).length
+			? "headers"
+			: "cdp";
+
+		if (postResult.identity) {
+			visitorSource = "client-body";
+			quirks = postResult.identity.quirks;
+			enrichments = postResult.identity.enrichments;
+			events = postResult.identity.events;
+			transitionStore = createCookieTransitionStore(postResult.identity);
+		} else {
+			const profileServiceUrl = parseUrl(env.PROFILE_SERVICE_URL);
+			if (profileServiceUrl) {
+				const cdpBaseUrl = new URL("/api/profiles", profileServiceUrl).toString();
+				const visitorId = request.headers.get("visitor-id");
+				Object.assign(quirks, await buildQuirks(visitorId, cdpBaseUrl));
+				if (visitorId) {
+					visitorSource = "cdp";
+				}
+			}
+		}
+
 		const params = new URLSearchParams(incomingUrl.searchParams);
-		params.set('projectId', env.UNIFORM_PROJECT_ID);
+		params.set("projectId", env.UNIFORM_PROJECT_ID);
 
 		const response = await fetch(`${uniformBaseUrl}?${params.toString()}`, {
-			method: 'GET',
+			method: "GET",
 			headers: {
-				'x-api-key': env.UNIFORM_API_KEY,
+				"x-api-key": env.UNIFORM_API_KEY,
 			},
 		});
 
@@ -106,13 +131,20 @@ export default {
 			await processComposition({
 				composition,
 				quirks,
+				enrichments,
+				events,
 				manifest: manifest as ManifestV2,
+				contextOptions: transitionStore ? { transitionStore } : undefined,
 			});
 		}
 
+		const headers = new Headers(response.headers);
+		headers.set("Content-Type", "application/json");
+		headers.set("x-uniform-visitor-source", visitorSource);
+
 		return new Response(JSON.stringify(data), {
 			status: response.status,
-			headers: response.headers,
+			headers,
 		});
 	},
 } satisfies ExportedHandler<Env>;

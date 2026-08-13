@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleContextRequest } from "@/lib/context-service";
+import { handleContextRequest, quirksFromHeaderRecord } from "@/lib/context-service";
 
 /**
  * Vercel Edge Middleware variant of the Context Service.
@@ -17,10 +17,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const visitorId = request.headers.get("visitor-id");
+  const method = request.method;
+  const bodyText = method === "POST" ? await request.text() : "";
 
   return handleContextRequest(
     request.nextUrl.searchParams,
     visitorId,
+    {
+      method,
+      bodyText,
+      headerQuirks: quirksFromHeaderRecord(Object.fromEntries(request.headers.entries())),
+    },
   );
 }
 

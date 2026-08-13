@@ -9,12 +9,28 @@ import {
 } from "@uniformdev/canvas";
 import type { ComponentInstance, ComponentParameter, RootComponentInstance } from "@uniformdev/canvas";
 import { Context } from "@uniformdev/context";
-import type { ManifestV2, ContextOptions } from "@uniformdev/context";
+import type { ContextOptions, EnrichmentData, EventData, ManifestV2 } from "@uniformdev/context";
+
+export {
+  CLIENT_VISITOR_BODY_MAX_CHARS,
+  createCookieTransitionStore,
+  extractUniformCookies,
+  parseVisitorBody,
+  quirksFromHeaderRecord,
+  resolvePostVisitorBody,
+  visitorFromClientPayload,
+  type ClientVisitorPayload,
+  type ParseVisitorBodyResult,
+  type ResolvedVisitorIdentity,
+  type ResolvePostVisitorResult,
+} from "./visitor-payload";
 
 export interface ProcessCompositionOptions {
   composition: RootComponentInstance;
   quirks: Record<string, string>;
   manifest: ManifestV2;
+  enrichments?: EnrichmentData[];
+  events?: EventData[];
   /**
    * Additional options forwarded to the Uniform Context constructor.
    * Use this to supply a custom `transitionStore` (e.g. CookieTransitionDataStore),
@@ -32,6 +48,8 @@ export async function processComposition({
   composition,
   quirks,
   manifest,
+  enrichments,
+  events,
   contextOptions,
 }: ProcessCompositionOptions): Promise<void> {
   const context = new Context({
@@ -40,7 +58,11 @@ export async function processComposition({
     manifest,
   });
 
-  await context.update({ quirks });
+  await context.update({
+    quirks,
+    ...(enrichments?.length ? { enrichments } : {}),
+    ...(events?.length ? { events } : {}),
+  });
 
   walkNodeTree(composition, (treeNode) => {
     if (treeNode.type !== "component") return;

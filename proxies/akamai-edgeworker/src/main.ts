@@ -1,7 +1,12 @@
 import type { RouteGetResponse } from '@uniformdev/canvas';
 import type { ManifestV2 } from '@uniformdev/context';
-import { CookieTransitionDataStore } from '@uniformdev/context';
-import { processComposition } from '@uniformdev/context-engine';
+import {
+	processComposition,
+	resolvePostVisitorBody,
+	quirksFromHeaderRecord,
+	extractUniformCookies,
+	createCookieTransitionStore,
+} from '@uniformdev/context-engine';
 import manifest from './context-manifest.json';
 import { httpRequest } from 'http-request';
 import { logger } from 'log';
@@ -19,38 +24,48 @@ export async function responseProvider(request: EW.ResponseProviderRequest) {
 			return createResponse(500, { 'Content-Type': 'text/html' }, '<html><body><h1>ApiKey is undefined</h1></body></html>');
 		}
 
+		const postResult = resolvePostVisitorBody(
+			request.method,
+			typeof request.text === 'function' ? await request.text() : '',
+		);
+		if (!postResult.ok) {
+			return createResponse(
+				postResult.status,
+				{ 'Content-Type': 'application/json' },
+				JSON.stringify({ error: postResult.message }),
+			);
+		}
+
+		const headers = request.getHeaders();
+		const cookieHeader = request.getHeader('Cookie')?.[0] || '';
+		const { ufvdCookieValue, quirkCookieValue } = extractUniformCookies(cookieHeader);
+
+		let quirks = quirksFromHeaderRecord(headers);
+		let cookieValue = ufvdCookieValue;
+		let quirkCookie = quirkCookieValue;
+		let enrichments = undefined;
+		let events = undefined;
+		let visitorSource: 'client-body' | 'cookies' = 'cookies';
+
+		if (postResult.identity) {
+			visitorSource = 'client-body';
+			quirks = postResult.identity.quirks;
+			cookieValue = postResult.identity.cookieValue;
+			quirkCookie = postResult.identity.quirkCookieValue;
+			enrichments = postResult.identity.enrichments;
+			events = postResult.identity.events;
+		} else {
+			const cookies = cookieHeader.split(';').map((cookie) => cookie.trim());
+			for (const cookie of cookies) {
+				logger.log('individual cookie', cookie);
+			}
+		}
+
 		const originalUrl = request.url;
 		const [path, search] = originalUrl.split('?');
-
 		const uniformUrl = `https://uniform.global${path}?${search}`;
 
-		// Extract quirks from headers
-		const quirks: Record<string, string> = {};
-		const headers = request.getHeaders();
-		for (const headerName in headers) {
-			if (headerName.startsWith('x-quirk-')) {
-				const headerValue = headers[headerName];
-				if (headerValue && headerValue.length > 0) {
-					quirks[headerName.replace('x-quirk-', '')] = headerValue[0];
-				}
-			}
-		}
-
-		// Extract cookie values for transition data store
-		const cookieHeader = request.getHeader('Cookie')?.[0] || '';
-		let ufvdCookieValue = '';
-		let quirkCookieValue = '';
-
-		const cookies = cookieHeader.split(';').map((cookie) => cookie.trim());
-		for (const cookie of cookies) {
-			logger.log('individual cookie', cookie);
-			if (cookie.startsWith('ufvd=')) {
-				ufvdCookieValue = cookie.substring(5);
-			} else if (cookie.startsWith('ufvdqk=')) {
-				quirkCookieValue = cookie.substring(7);
-			}
-		}
-
+		// Outbound fetch stays GET so Property Manager can cache the Uniform composition.
 		const requestOptions = {
 			headers: {
 				'x-api-key': apiKey,
@@ -76,19 +91,25 @@ export async function responseProvider(request: EW.ResponseProviderRequest) {
 				await processComposition({
 					composition: route.compositionApiResponse.composition,
 					quirks,
+					enrichments,
+					events,
 					manifest: manifest as ManifestV2,
 					contextOptions: {
-						transitionStore: new CookieTransitionDataStore({
-							cookieName: 'ufvd',
-							serverCookieValue: ufvdCookieValue,
-							quirkCookieName: 'ufvdqk',
-							quirkCookieValue: quirkCookieValue,
-							experimental_quirksEnabled: true,
+						transitionStore: createCookieTransitionStore({
+							cookieValue,
+							quirkCookieValue: quirkCookie,
 						}),
 					},
 				});
 
-				return createResponse(200, { 'Content-Type': 'application/json' }, JSON.stringify(route));
+				return createResponse(
+					200,
+					{
+						'Content-Type': 'application/json',
+						'x-uniform-visitor-source': visitorSource,
+					},
+					JSON.stringify(route),
+				);
 			}
 		}
 

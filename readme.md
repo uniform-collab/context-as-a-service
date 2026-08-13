@@ -6,30 +6,44 @@ This pattern is recommended for **mobile apps**, **non-JavaScript runtimes**, an
 
 ## How it works
 
-```
-                                +-----------------------+
-                                |  Mock Profile Service |
-                                |  (visitor profiles)   |
-                                +----------+------------+
-                                           |
-Client --- visitor-id ---> Context Service -+---> Uniform Route API
-                                |                    |
-                                v                    v
-                          Context Engine         Raw composition
-                        (personalize + test)
-                                |
-                                v
-                        Resolved composition ---> Client
+```mermaid
+flowchart LR
+  Client[Client / device]
+  Proxy[Context proxy<br/>Akamai / CF / Next.js]
+  CDP[CDP or cookies<br/>or x-quirk-* headers]
+  Cache[Uniform GET<br/>cacheable]
+  Engine[Context Engine]
+  Client -->|GET visitor-id / cookies / headers| Proxy
+  Client -->|POST JSON body| Proxy
+  Proxy -.->|default injection| CDP
+  Proxy -->|GET /api/v1/route| Cache
+  Proxy --> Engine
+  Engine -->|personalized JSON<br/>not cached| Client
 ```
 
-1. The client sends a request with an optional `visitor-id` header (or quirks via other means depending on the specific proxy used).
-2. The service looks up the visitor's profile to build **quirks** -- key-value pairs like `audience`, `geoAudience`, and `hasReservation`.
-3. It fetches the page composition from Uniform's Route API.
+1. The client sends either:
+   - **GET** with injected identity (`visitor-id` CDP lookup, `ufvd` cookies, and/or `x-quirk-*` headers), or
+   - **POST** with a JSON body containing quirks, device, scores, tests, enrichments, and events (skips CDP/cookie injection).
+2. On GET, the service looks up the visitor's profile or cookies to build **quirks** -- key-value pairs like `audience`, `geoAudience`, and `hasReservation`.
+3. It **GET**s the page composition from Uniform's Route API (this subrequest can be cached).
 4. Using the **context manifest** and the visitor's quirks, it walks the composition tree and:
    - Resolves **personalization** nodes to the best-matching variant
    - Picks an **A/B test** variant
    - Strips resolution metadata (`$pzCrit`, `$tstVrnt`, `pz`, `control`, `id`) from the output
-5. Returns the fully resolved, clean composition as JSON.
+5. Returns the fully resolved, clean composition as JSON. The personalized response is not cached.
+
+```mermaid
+flowchart TD
+  A[Incoming request] --> B{POST with non-empty body?}
+  B -->|No| C[Proxy fallback:<br/>visitor-id CDP, cookies,<br/>and/or x-quirk-* headers]
+  B -->|Yes| D{Body ≤ 2000 chars<br/>and valid JSON?}
+  D -->|No| E[400]
+  D -->|Yes| F[Use client body<br/>skip CDP / cookies]
+  C --> G[Context Engine]
+  F --> G
+  G --> H[GET Uniform composition]
+  H --> I[Personalized JSON<br/>x-uniform-visitor-source]
+```
 
 ## Repository structure
 
@@ -103,6 +117,8 @@ Shared library (`@uniformdev/context-engine`) that all proxies depend on. Provid
 
 The library accepts a manifest and optional context options (e.g. `CookieTransitionDataStore`), keeping it runtime-agnostic. Each proxy only handles its platform-specific concerns (HTTP, env vars, quirks sourcing).
 
+It also parses the optional **POST visitor body** (`parseVisitorBody`, `resolvePostVisitorBody`) so Akamai, Cloudflare, and Next.js share the same client-supplied identity contract.
+
 ## Proxy implementations
 
 ### [Next.js (`proxies/nextjs-api/`)](proxies/nextjs-api/)
@@ -152,7 +168,7 @@ See [`examples/console-client/README.md`](examples/console-client/README.md) for
 
 ## Shared API contract
 
-All proxies expose the same API:
+All proxies expose the same API.
 
 ### `GET /api/v1/route?path=<page-path>`
 
@@ -160,17 +176,38 @@ Proxies to Uniform's Route API with server-side personalization applied. All que
 
 **Headers:**
 
-| Header       | Required | Description                           |
-|--------------|----------|---------------------------------------|
-| `visitor-id` | No       | Visitor identifier for profile lookup |
+| Header        | Required | Description |
+|---------------|----------|-------------|
+| `visitor-id`  | No       | Visitor identifier for CDP profile lookup (Next.js / Cloudflare) |
+| `x-quirk-*`   | No       | Injected quirks (all proxies) |
+| `Cookie`      | No       | `ufvd` / `ufvdqk` transition cookies (Akamai) |
 
-**Response:** The full Uniform route response with personalization and test nodes resolved inline, and SDK metadata stripped.
+### `POST /api/v1/route?path=<page-path>`
 
-**Example:**
+Same Uniform GET under the hood, but visitor identity comes from the JSON body instead of CDP/cookie injection. Body must be **2000 characters or fewer**.
+
+```json
+{
+  "quirks": { "audience": "golf" },
+  "device": { "os": "ios", "type": "phone" },
+  "scores": { "launchCampaign": 10 },
+  "tests": { "homeScreenHeroTest": "variant" },
+  "enrichments": [{ "cat": "audience", "key": "golf", "str": 10 }],
+  "events": [{ "event": "app_open" }]
+}
+```
+
+An empty POST body falls back to the GET injection path. A non-empty POST body is the source of truth. Successful responses include `x-uniform-visitor-source`: `client-body`, `cdp`, `cookies`, or `headers`.
+
+**Examples:**
 
 ```bash
 curl "http://localhost:3000/api/v1/route?path=/" \
   -H "visitor-id: 123"
+
+curl -X POST "http://localhost:3000/api/v1/route?path=/" \
+  -H "Content-Type: application/json" \
+  -d '{"quirks":{"audience":"golf","hasReservation":"false"},"device":{"os":"ios"}}'
 ```
 
 ## Prerequisites
