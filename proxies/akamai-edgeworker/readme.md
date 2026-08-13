@@ -6,6 +6,7 @@ An Akamai EdgeWorker that provides server-side Uniform Context personalization a
 
 - **Header-based quirks** -- reads `x-quirk-*` headers from the incoming request instead of (or in addition to) a CDP profile lookup. This allows the CDN or origin to inject quirks upstream.
 - **Cookie-based transition data** -- uses `CookieTransitionDataStore` with `ufvd` and `ufvdqk` cookies for persistent visitor context across requests.
+- **POST visitor body** -- optional JSON parsed by this proxy's `src/visitorPayload.ts` (replace with your own contract). Skips cookie/header injection.
 - **Akamai property variables** -- reads `PMUSER_UNIFORM_PROJECTID` and `PMUSER_UNIFORM_API_KEY` from Akamai property manager variables instead of environment variables.
 - **Rollup bundle** -- EdgeWorkers require a single bundled JS file with a `bundle.json` manifest, built via Rollup.
 
@@ -14,11 +15,63 @@ An Akamai EdgeWorker that provides server-side Uniform Context personalization a
 The `responseProvider` handler:
 
 1. Reads Uniform credentials from Akamai property variables.
-2. Extracts quirks from `x-quirk-*` request headers and transition data from `ufvd`/`ufvdqk` cookies.
-3. Forwards the request to Uniform's Route API via `httpRequest`.
+2. Resolves visitor identity from a **POST JSON body**, or from `x-quirk-*` headers and `ufvd`/`ufvdqk` cookies.
+3. **GET**s Uniform's Route API via `httpRequest` (cacheable). The personalized response is not cached.
 4. Resolves personalization and A/B test nodes in the composition tree.
 5. Strips SDK metadata (`$pzCrit`, `$tstVrnt`, `pz`, `control`, `id`) from resolved nodes.
-6. Returns the processed composition via `createResponse`.
+6. Returns the processed composition via `createResponse`, with `x-uniform-visitor-source`.
+
+```mermaid
+flowchart TD
+  A[Device] --> B{POST JSON body?}
+  B -->|Yes| C[Parse quirks, device, scores]
+  B -->|No| D[ufvd cookies + x-quirk-*]
+  C --> E[responseProvider]
+  D --> E
+  E --> F[GET Uniform composition]
+  F --> G[Personalized JSON]
+```
+
+### Default: CDP / cookie injection
+
+`GET /api/v1/route?...` with `ufvd` / `ufvdqk` cookies and `x-quirk-*` headers.
+
+```mermaid
+sequenceDiagram
+  participant Device
+  participant CDP as CDP / Akamai
+  participant EW as EdgeWorker
+  participant Uniform as Uniform API
+  Device->>CDP: request
+  CDP->>EW: GET /api/v1/route + cookies/headers
+  EW->>Uniform: GET composition
+  Uniform-->>EW: composition JSON
+  EW->>EW: personalize
+  EW-->>Device: JSON x-uniform-visitor-source: cookies
+```
+
+### Side option: client-supplied JSON body
+
+POST the same visitor data instead of injecting cookies/headers. Keep the body at **2000 characters or fewer**.
+
+```mermaid
+sequenceDiagram
+  participant Device
+  participant EW as EdgeWorker
+  participant Uniform as Uniform API
+  Device->>EW: POST /api/v1/route JSON body
+  Note over Device,EW: cookies and x-quirk-* are ignored
+  EW->>Uniform: GET composition
+  Uniform-->>EW: composition JSON
+  EW->>EW: personalize from body
+  EW-->>Device: JSON x-uniform-visitor-source: client-body
+```
+
+```bash
+curl -X POST 'https://<ew-host>/api/v1/route?path=/' \
+  -H 'Content-Type: application/json' \
+  -d '{"quirks":{"audience":"golf"},"device":{"os":"ios"}}'
+```
 
 ## Project structure
 
@@ -26,6 +79,7 @@ The `responseProvider` handler:
 akamai-edgeworker/
 +-- src/
 |   +-- main.ts                 EdgeWorker entry point
+|   +-- visitorPayload.ts       This proxy's POST body parser (replaceable)
 |   +-- bundle.json             Akamai bundle manifest
 |   +-- context-manifest.json   Uniform Context manifest
 +-- tests/                      Jest tests

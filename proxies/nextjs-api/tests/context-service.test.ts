@@ -174,4 +174,53 @@ describe("handleContextRequest", () => {
     const response = await handleContextRequest(new URLSearchParams({ path: "/" }), null);
     expect(response.status).toBe(400);
   });
+
+  test("POST visitor body skips CDP lookup and still GETs Uniform", async () => {
+    mockUniformApi();
+
+    const response = await handleContextRequest(
+      new URLSearchParams({ path: "/" }),
+      "1",
+      {
+        method: "POST",
+        bodyText: JSON.stringify({
+          quirks: { audience: "golf", hasReservation: "false" },
+          device: { os: "ios" },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-uniform-visitor-source")).toBe("client-body");
+
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const urls = fetchMock.mock.calls.map((call) => {
+      const input = call[0] as string | URL | Request;
+      return typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    });
+    expect(urls.some((url) => url.includes("/profiles/"))).toBe(false);
+    expect(urls.some((url) => url.includes("uniform.global"))).toBe(true);
+
+    const uniformCall = fetchMock.mock.calls.find((call) => {
+      const input = call[0] as string | URL | Request;
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      return url.includes("uniform.global");
+    });
+    expect(uniformCall?.[1]).toMatchObject({ method: "GET" });
+  });
+
+  test("rejects oversized POST visitor bodies", async () => {
+    const response = await handleContextRequest(
+      new URLSearchParams({ path: "/" }),
+      null,
+      {
+        method: "POST",
+        bodyText: JSON.stringify({ quirks: { blob: "x".repeat(2000) } }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toMatch(/2000 characters/);
+  });
 });

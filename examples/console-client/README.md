@@ -21,7 +21,7 @@ const response = await fetch("http://localhost:3000/api/v1/route?path=/", ...);
 
 ## What it does
 
-1. Sends `GET /api/v1/route?path=/` with `visitor-id: 123`.
+1. Sends `GET /api/v1/route?path=/` with `visitor-id: 123` (or `POST` with a visitor JSON body when `USE_POST_BODY=true`).
 2. Parses the JSON response.
 3. Logs the title of the first content slot component.
 

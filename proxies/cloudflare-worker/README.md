@@ -6,11 +6,43 @@ A Cloudflare Worker that acts as a BFF for server-side Uniform Context personali
 
 A single `fetch` handler receives all requests, resolves personalization and A/B tests against Uniform's Route API, and returns a clean composition.
 
-1. Reads `visitor-id` header and fetches the visitor's profile from the mock CDP to build quirks.
-2. Forwards all incoming query parameters to the Uniform Route API with `projectId` and `x-api-key`.
-3. Walks the composition tree to resolve personalization and A/B test nodes.
-4. Strips SDK metadata (`$pzCrit`, `$tstVrnt`, `pz`, `control`, `id`) from resolved nodes.
-5. Returns the processed composition with upstream headers preserved. Errors are passed through unchanged.
+1. On **GET**, reads `visitor-id` and/or `x-quirk-*` headers. `visitor-id` fetches the mock CDP profile to build quirks.
+2. On **POST**, this Worker's `src/visitorPayload.ts` parser reads the JSON body and skips CDP lookup. Replace that file with your own payload contract.
+3. **GET**s the Uniform Route API with `projectId` and `x-api-key` (cacheable). The personalized response is not cached.
+4. Walks the composition tree to resolve personalization and A/B test nodes.
+5. Strips SDK metadata and returns the processed composition with `x-uniform-visitor-source`.
+
+```mermaid
+flowchart TD
+  A[Device] --> B{POST JSON body?}
+  B -->|Yes| C[Use client quirks/scores]
+  B -->|No| D[x-quirk-* and/or visitor-id CDP]
+  C --> E[Cloudflare Worker]
+  D --> E
+  E --> F[GET Uniform composition]
+  F --> G[Personalized JSON]
+```
+
+```mermaid
+sequenceDiagram
+  participant Device
+  participant Worker as Cloudflare Worker
+  participant CDP as Profile service
+  participant Uniform as Uniform API
+
+  alt GET with visitor-id
+    Device->>Worker: GET /api/v1/route
+    Worker->>CDP: GET /api/profiles/{id}
+    CDP-->>Worker: profile quirks
+  else POST visitor body
+    Device->>Worker: POST JSON quirks/device/scores
+    Note over Device,Worker: CDP lookup is skipped
+  end
+  Worker->>Uniform: GET composition
+  Uniform-->>Worker: composition JSON
+  Worker->>Worker: personalize
+  Worker-->>Device: JSON + x-uniform-visitor-source
+```
 
 ## Project structure
 
@@ -18,6 +50,7 @@ A single `fetch` handler receives all requests, resolves personalization and A/B
 cloudflare-worker/
 +-- src/
 |   +-- index.ts                Worker entry point
+|   +-- visitorPayload.ts       This Worker's POST body parser (replaceable)
 |   +-- context-manifest.json   Uniform Context manifest
 +-- wrangler.toml               Wrangler config (gitignored)
 +-- wrangler.toml.example       Template config
@@ -67,12 +100,21 @@ All query parameters are forwarded to the Uniform Route API.
 | Header       | Required | Description                           |
 |--------------|----------|---------------------------------------|
 | `visitor-id` | No       | Visitor identifier for profile lookup |
-
-**Example:**
+| `x-quirk-*`  | No       | Injected quirks (merged with CDP)     |
 
 ```bash
 curl "http://localhost:8787/api/v1/route?path=/" \
   -H "visitor-id: 123"
+```
+
+### `POST /api/v1/route?path=<page-path>`
+
+Send visitor data in the body instead of injecting a CDP profile. Body max **2000** characters.
+
+```bash
+curl -X POST "http://localhost:8787/api/v1/route?path=/" \
+  -H "Content-Type: application/json" \
+  -d '{"quirks":{"audience":"golf","hasReservation":"false"},"device":{"os":"ios"}}'
 ```
 
 ## Environment variables

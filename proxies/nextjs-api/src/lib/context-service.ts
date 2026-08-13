@@ -2,6 +2,10 @@ import { type RootComponentInstance } from "@uniformdev/canvas";
 import { type ManifestV2 } from "@uniformdev/context";
 import { processComposition } from "@uniformdev/context-engine";
 export { processComposition };
+import {
+  resolvePostVisitorBody,
+  createCookieTransitionStore,
+} from "./visitorPayload";
 import manifest from "./context-manifest.json";
 import { NextResponse } from "next/server";
 
@@ -14,6 +18,12 @@ interface Profile {
   reservation: { confirmationNumber: string } | null;
   membershipStatus: string;
 }
+
+export type HandleContextRequestOptions = {
+  method?: string;
+  bodyText?: string | null;
+  headerQuirks?: Record<string, string>;
+};
 
 /**
  * Fetches a visitor profile from the CDP mock and builds quirks
@@ -70,10 +80,14 @@ export async function fetchComposition(
 /**
  * Full request handler: orchestrates quirks lookup, Uniform API call,
  * and composition processing. Returns a Response ready to send to the client.
+ *
+ * POST with a visitor JSON body skips CDP lookup and uses the client payload.
+ * GET (or empty POST) still uses visitor-id + optional x-quirk-* headers.
  */
 export async function handleContextRequest(
   searchParams: URLSearchParams,
   visitorId: string | null,
+  options: HandleContextRequestOptions = {},
 ): Promise<Response> {
   const projectId = process.env.UNIFORM_PROJECT_ID;
   const apiKey = process.env.UNIFORM_API_KEY;
@@ -85,7 +99,31 @@ export async function handleContextRequest(
     );
   }
 
-  const quirks = await buildQuirks(visitorId);
+  const postResult = resolvePostVisitorBody(options.method, options.bodyText);
+  if (!postResult.ok) {
+    return NextResponse.json({ error: postResult.message }, { status: postResult.status });
+  }
+
+  let quirks = { ...(options.headerQuirks ?? {}) };
+  let enrichments = undefined;
+  let events = undefined;
+  let transitionStore = undefined;
+  let visitorSource: "client-body" | "cdp" | "headers" = Object.keys(quirks).length
+    ? "headers"
+    : "cdp";
+
+  if (postResult.identity) {
+    visitorSource = "client-body";
+    quirks = postResult.identity.quirks;
+    enrichments = postResult.identity.enrichments;
+    events = postResult.identity.events;
+    transitionStore = createCookieTransitionStore(postResult.identity);
+  } else {
+    Object.assign(quirks, await buildQuirks(visitorId));
+    if (visitorId) {
+      visitorSource = "cdp";
+    }
+  }
 
   const response = await fetchComposition(searchParams, projectId, apiKey);
 
@@ -109,15 +147,21 @@ export async function handleContextRequest(
     await processComposition({
       composition,
       quirks,
+      enrichments,
+      events,
       manifest: manifest as ManifestV2,
+      contextOptions: transitionStore ? { transitionStore } : undefined,
     });
   }
 
   const upstreamHeaders = new Headers(response.headers);
   upstreamHeaders.set("Content-Type", "application/json");
+  upstreamHeaders.set("x-uniform-visitor-source", visitorSource);
 
   return new Response(JSON.stringify(data), {
     status: response.status,
     headers: upstreamHeaders,
   });
 }
+
+export { quirksFromHeaderRecord } from "./visitorPayload";

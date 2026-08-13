@@ -7,38 +7,53 @@ Server-side Uniform Context personalization as a Next.js Backend-for-Frontend (B
 | **A -- API Route** | Node.js | Self-hosted Next.js (Azure, Docker, AWS, etc.) |
 | **B -- Edge Middleware** | Vercel Edge | Vercel deployments |
 
-Both expose the same API contract -- `GET /api/v1/route?path=<page-path>` -- and produce identical output.
+Both expose the same API contract -- `GET` or `POST /api/v1/route?path=<page-path>` -- and produce identical output.
 
 ## How it works
 
 The service is a transparent proxy between your frontend and the Uniform Canvas Route API. Before returning the composition to the client, it resolves personalization, A/B tests, and strips SDK metadata so the browser receives a clean, fully processed composition.
 
-```
-                                +-----------------------+
-                                |  Mock Profile Service |
-                                |  (visitor profiles)   |
-                                +----------+------------+
-                                           |
-Client --- GET /api/v1/route ---> Next.js -+---> Uniform Route API
-             + visitor-id          |                   |
-                                   v                   v
-                             Context Engine       Raw composition
-                           (personalize + test)
-                                   |
-                                   v
-                           Resolved composition ---> Client
+```mermaid
+flowchart LR
+  Client[Client]
+  Next[Next.js API or Edge middleware]
+  CDP[Mock profile service]
+  Uniform[Uniform Route API]
+  Client -->|GET visitor-id / x-quirk-*| Next
+  Client -->|POST JSON body| Next
+  Next -.->|GET fallback| CDP
+  Next -->|GET composition| Uniform
+  Next -->|personalized JSON| Client
 ```
 
 ### Request flow
 
-1. Client sends `GET /api/v1/route?path=/some-page` with an optional `visitor-id` header.
-2. If `visitor-id` is present, the service fetches the visitor's profile from the mock CDP and builds **quirks** (`audience`, `geoAudience`, `hasReservation`).
-3. All incoming query parameters are forwarded to the Uniform Route API along with `projectId` and `x-api-key` authentication.
-4. If the response is a composition, the service walks the tree and:
-   - Resolves **personalization** nodes to the best-matching variant
-   - Picks an **A/B test** variant
-   - Strips resolution metadata (`$pzCrit`, `$tstVrnt`, `pz`, `control`, `id`)
-5. Returns the resolved composition with original upstream headers preserved.
+1. Client sends `GET /api/v1/route?path=/some-page` with optional `visitor-id` / `x-quirk-*`, **or** `POST` with a visitor JSON body.
+2. On GET, if `visitor-id` is present, the service fetches the visitor's profile from the mock CDP and builds **quirks**. POST skips CDP lookup.
+3. The Uniform Route API is always fetched with **GET** (`projectId` + `x-api-key`).
+4. If the response is a composition, the service walks the tree and resolves personalization and tests.
+5. Returns the resolved composition with `x-uniform-visitor-source`.
+
+```mermaid
+sequenceDiagram
+  participant Device
+  participant Next as Next.js
+  participant CDP as Profile service
+  participant Uniform as Uniform API
+
+  alt GET with visitor-id
+    Device->>Next: GET /api/v1/route
+    Next->>CDP: GET /api/profiles/{id}
+    CDP-->>Next: profile quirks
+  else POST visitor body
+    Device->>Next: POST JSON quirks/device/scores
+    Note over Device,Next: CDP lookup is skipped
+  end
+  Next->>Uniform: GET composition
+  Uniform-->>Next: composition JSON
+  Next->>Next: Context Engine
+  Next-->>Device: JSON + x-uniform-visitor-source
+```
 
 ## Project structure
 
@@ -50,6 +65,7 @@ nextjs-api/
 |   |       +-- route.ts              (A) Node.js API route handler
 |   +-- lib/
 |   |   +-- context-service.ts        Shared core logic
+|   |   +-- visitorPayload.ts         This proxy's POST body parser (replaceable)
 |   |   +-- context-manifest.json     Uniform Context manifest
 |   +-- middleware.ts                 (B) Vercel Edge middleware
 +-- tests/
@@ -69,11 +85,13 @@ nextjs-api/
 |----------|---------|
 | `buildQuirks(visitorId)` | Fetches CDP profile, returns quirks map |
 | `fetchComposition(searchParams, projectId, apiKey)` | Calls Uniform Route API, forwards all query params |
+| `handleContextRequest(searchParams, visitorId, options?)` | Full orchestrator -- GET uses CDP/`x-quirk-*`; POST uses this proxy's parser |
 | `processComposition({ composition, quirks })` | Walks the tree: resolves personalization and A/B tests |
 | `stripResolvedMetadata(node)` | Recursively removes SDK metadata from resolved nodes |
-| `handleContextRequest(searchParams, visitorId)` | Full orchestrator -- calls the above in sequence |
 
-**`src/app/api/v1/route/route.ts`** -- Mode A. Standard Next.js App Router GET handler, Node.js runtime.
+**`src/lib/visitorPayload.ts`** -- This proxy's POST JSON parser. Not shared. Replace with your device/CDP contract.
+
+**`src/app/api/v1/route/route.ts`** -- Mode A. Standard Next.js App Router GET/POST handlers, Node.js runtime.
 
 **`src/middleware.ts`** -- Mode B. Intercepts `/api/v1/route` at the edge, gated behind `ENABLE_EDGE_MIDDLEWARE=true`.
 
@@ -149,8 +167,17 @@ Fetches and resolves a Uniform Canvas composition. All query parameters are forw
 | Header | Required | Description |
 |--------|----------|-------------|
 | `visitor-id` | No | Visitor identifier for profile lookup |
+| `x-quirk-*` | No | Injected quirks (merged with CDP) |
 
-**Response:** Resolved composition JSON with upstream status and headers preserved. On error, the upstream response body and status are passed through unchanged.
+### `POST /api/v1/route`
+
+Same resolution, but visitor identity comes from the JSON body (max 2000 characters) instead of CDP injection.
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/route?path=/" \
+  -H "Content-Type: application/json" \
+  -d '{"quirks":{"audience":"golf","hasReservation":"false"},"device":{"os":"ios"}}'
+```
 
 ## Mode A -- Node.js API Route (self-hosted)
 
